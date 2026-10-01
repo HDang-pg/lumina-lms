@@ -1,0 +1,4 @@
+"use client";
+import { useState } from "react";
+function csrf(){return document.cookie.split(";").map(x=>x.trim()).find(x=>x.startsWith("lms_csrf="))?.split("=")[1]||""}
+export default function DiscussionBox({lessonId}:{lessonId:string}){const[v,setV]=useState('');const[busy,setBusy]=useState(false);async function submit(){if(!v.trim())return;setBusy(true);const r=await fetch('/api/discussions',{method:'POST',headers:{'content-type':'application/json','x-csrf-token':csrf()},body:JSON.stringify({lessonId,content:v})});if(r.ok){setV('');window.location.reload()}else alert((await r.json()).error);setBusy(false)}return <div className="mt-4 flex gap-2"><input className="input" value={v} onChange={e=>setV(e.target.value)} placeholder="Đặt câu hỏi dưới bài học…"/><button disabled={busy} onClick={submit} className="btn btn-secondary">Gửi</button></div>}

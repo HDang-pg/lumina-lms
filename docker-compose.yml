@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lumina_lms
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - lumina_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lumina_lms"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/lumina_lms
+      AUTH_SECRET: change-me-in-production
+      APP_URL: http://localhost:3000
+      STORAGE_LOCAL: "1"
+    ports:
+      - "0.0.0.0:3000:3000"
+    volumes:
+      - lumina_storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  lumina_pg:
+  lumina_storage:
