@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { Role } from "@prisma/client";
-import crypto from "crypto";
+
 
 const secret = new TextEncoder().encode(process.env.AUTH_SECRET || "dev-secret-change-me");
 
