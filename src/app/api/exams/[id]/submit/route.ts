@@ -79,20 +79,41 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const score = Math.round((earned / Math.max(total, 1)) * 100) / 10;
 
-  // Thêm cấu hình timeout 15000ms (15 giây) vào transaction
-  await prisma.$transaction(
-    async tx => {
-      for (const a of answerRows) await tx.answer.upsert({ where: { attemptId_questionId: { attemptId: a.attemptId, questionId: a.questionId } }, update: a, create: a });
-      await tx.attempt.update({ where: { id: attempt.id }, data: { submittedAt: now, status: body.autoSubmitted ? "AUTO_SUBMITTED" : "SUBMITTED", score } });
-      await tx.gamification.upsert({ where: { studentId: s.id }, update: { points: { increment: 20 }, streak: { increment: 1 }, lastStudyAt: now }, create: { studentId: s.id, points: 20, streak: 1, lastStudyAt: now } });
-      for (const code of ["FIRST_ASSIGNMENT", "ON_TIME_HERO"] as const) await tx.studentBadge.upsert({ where: { studentId_code: { studentId: s.id, code } }, update: {}, create: { studentId: s.id, code } });
-      await tx.notification.create({ data: { userId: exam.course.teacherId, title: "Có bài nộp mới", body: `${s.name} đã nộp bài "${exam.title}".`, href: `/teacher/grading?attemptId=${attempt.id}` } });
-    },
-    {
-      maxWait: 5000,
-      timeout: 15000, // Tăng từ 5s mặc định lên 15s
+  // Transaction nhẹ chỉ lưu điểm bài làm
+  await prisma.$transaction(async tx => {
+    for (const a of answerRows) {
+      await tx.answer.upsert({
+        where: { attemptId_questionId: { attemptId: a.attemptId, questionId: a.questionId } },
+        update: a,
+        create: a
+      });
     }
-  );
+    await tx.attempt.update({
+      where: { id: attempt.id },
+      data: { submittedAt: now, status: body.autoSubmitted ? "AUTO_SUBMITTED" : "SUBMITTED", score }
+    });
+  });
+
+  // Tách Gamification ra ngoài
+  try {
+    await prisma.gamification.upsert({
+      where: { studentId: s.id },
+      update: { points: { increment: 20 }, streak: { increment: 1 }, lastStudyAt: now },
+      create: { studentId: s.id, points: 20, streak: 1, lastStudyAt: now }
+    });
+    for (const code of ["FIRST_ASSIGNMENT", "ON_TIME_HERO"] as const) {
+      await prisma.studentBadge.upsert({
+        where: { studentId_code: { studentId: s.id, code } },
+        update: {},
+        create: { studentId: s.id, code }
+      });
+    }
+    await prisma.notification.create({
+      data: { userId: exam.course.teacherId, title: "Có bài nộp mới", body: `${s.name} đã nộp bài "${exam.title}".`, href: `/teacher/grading?attemptId=${attempt.id}` }
+    });
+  } catch (e) {
+    console.error("Lỗi gamification/badge:", e);
+  }
 
   return NextResponse.json({ score, pendingEssay });
 }
