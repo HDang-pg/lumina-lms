@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { readSession } from "@/lib/auth";
 import { assertCsrf } from "@/lib/csrf";
 import { z } from "zod";
+import { recordStudyActivity } from "@/lib/streak";
 
 const schema = z.object({
   answers: z.record(z.string(), z.string()).default({}),
@@ -95,12 +96,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   });
 
   // Tách Gamification ra ngoài
-  try {
-    await prisma.gamification.upsert({
-      where: { studentId: s.id },
-      update: { points: { increment: 20 }, streak: { increment: 1 }, lastStudyAt: now },
-      create: { studentId: s.id, points: 20, streak: 1, lastStudyAt: now }
-    });
+try {
+  await prisma.gamification.upsert({
+    where: { studentId: s.id },
+    update: { points: { increment: 20 } },
+    create: { studentId: s.id, points: 20 }
+  });
+
+  await recordStudyActivity(s.id, now);
     for (const code of ["FIRST_ASSIGNMENT", "ON_TIME_HERO"] as const) {
       await prisma.studentBadge.upsert({
         where: { studentId_code: { studentId: s.id, code } },
