@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
-import { SESSION_COOKIE } from "@/lib/auth";
+import { SESSION_COOKIE } from "@/lib/session-constants";
 
 const secret = new TextEncoder().encode(
   process.env.AUTH_SECRET || "dev-secret-change-me"
